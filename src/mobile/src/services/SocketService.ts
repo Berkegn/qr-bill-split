@@ -40,6 +40,12 @@ class SocketService {
     }
   }
 
+  public async unselectItemToPay(tableId: string, itemId: number, userId: string) {
+    if (this.connection?.state === signalR.HubConnectionState.Connected) {
+      await this.connection.invoke('UnselectItemToPay', tableId, itemId, userId);
+    }
+  }
+
   public async joinStaffGroup() {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('JoinStaffGroup');

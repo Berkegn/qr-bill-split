@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import QRScannerScreen from './src/screens/QRScannerScreen';
 import BillSplitScreen from './src/screens/BillSplitScreen';
 import B2BDashboardScreen from './src/screens/B2BDashboardScreen';
@@ -20,7 +20,7 @@ function MainApp() {
   const { user, isLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<ScreenState>('Login');
   const [tableId, setTableId] = useState<string>('');
-  const [currencySymbol, setCurrencySymbol] = useState<string>('$');
+  const [currencySymbol, setCurrencySymbol] = useState<string>('₺');
   const [receiptData, setReceiptData] = useState<ReceiptResponse | null>(null);
   const [otpEmail, setOtpEmail] = useState<string>('');
 
@@ -134,9 +134,11 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

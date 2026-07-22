@@ -34,6 +34,10 @@ public class AnalyticsController : ControllerBase
         {
             startDate = now.Date.AddDays(-365);
         }
+        else if (period.Equals("debug", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new { Count = await _context.Receipts.CountAsync() });
+        }
 
         // Fetch all receipts for the timeframe
         var receipts = await _context.Receipts
@@ -77,11 +81,18 @@ public class AnalyticsController : ControllerBase
             new { name = "Split Bill", value = totalOrders > 0 ? (int)Math.Round((double)splitCount / totalOrders * 100) : 0, fill = "#2563EB" }
         };
 
-        // Income vs Expenses
-        var incomeExpensesData = new List<object>
-        {
-            new { name = "Today", Revenue = totalRevenue, Expenses = expenses }
-        };
+        // Daily Revenue Timeline
+        var incomeExpensesData = receipts
+            .GroupBy(r => r.OpenedAt.Date)
+            .Select(g => new
+            {
+                name = g.Key.ToString("dd MMM"),
+                date = g.Key,
+                Revenue = g.Sum(r => r.TotalAmount),
+                Expenses = g.Sum(r => r.TotalAmount) * 0.25m
+            })
+            .OrderBy(g => g.date)
+            .ToList();
 
         // Peak Hours (Group by Hour of Checkout)
         var peakHoursData = receipts

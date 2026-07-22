@@ -26,30 +26,28 @@ public static class DbSeeder
             context.SaveChanges();
         }
 
-        if (context.TableSessions.Any())
+        if (!context.TableSessions.Any())
         {
-            return; // DB has been seeded
+            var tableSession = new TableSession
+            {
+                Id = "table-5",
+                TableName = "Table 5",
+                TotalAmount = 45.00m
+            };
+
+            var billItems = new List<BillItem>
+            {
+                new BillItem { Name = "Latte", Price = 5.50m, TableSessionId = tableSession.Id },
+                new BillItem { Name = "Cappuccino", Price = 6.00m, TableSessionId = tableSession.Id },
+                new BillItem { Name = "Cheesecake", Price = 8.50m, TableSessionId = tableSession.Id },
+                new BillItem { Name = "Avocado Toast", Price = 12.00m, TableSessionId = tableSession.Id },
+                new BillItem { Name = "Iced Americano", Price = 13.00m, TableSessionId = tableSession.Id }
+            };
+
+            context.TableSessions.Add(tableSession);
+            context.BillItems.AddRange(billItems);
+            context.SaveChanges();
         }
-
-        var tableSession = new TableSession
-        {
-            Id = "table-5",
-            TableName = "Table 5",
-            TotalAmount = 45.00m
-        };
-
-        var billItems = new List<BillItem>
-        {
-            new BillItem { Name = "Latte", Price = 5.50m, TableSessionId = tableSession.Id },
-            new BillItem { Name = "Cappuccino", Price = 6.00m, TableSessionId = tableSession.Id },
-            new BillItem { Name = "Cheesecake", Price = 8.50m, TableSessionId = tableSession.Id },
-            new BillItem { Name = "Avocado Toast", Price = 12.00m, TableSessionId = tableSession.Id },
-            new BillItem { Name = "Iced Americano", Price = 13.00m, TableSessionId = tableSession.Id }
-        };
-
-        context.TableSessions.Add(tableSession);
-        context.BillItems.AddRange(billItems);
-        context.SaveChanges();
 
         // Seed Tables
         if (!context.RestaurantTables.Any())
@@ -64,22 +62,33 @@ public static class DbSeeder
         }
 
         // Seed Receipts
-        if (!context.Receipts.Any())
+        var existingReceiptsCount = context.Receipts.Count();
+        if (existingReceiptsCount <= 350)
         {
+            // Wipe existing to prevent duplicates/conflicts and get clean 30 day spread
+            context.OrderItems.RemoveRange(context.OrderItems);
+            context.Receipts.RemoveRange(context.Receipts);
+            context.SaveChanges();
+
             var tables = context.RestaurantTables.ToList();
             var random = new Random();
             var receipts = new List<Receipt>();
             var orderItems = new List<OrderItem>();
             
-            string[] items = { "Cheesecake", "Iced Latte", "Brownie", "Americano", "Filter Coffee" };
-            decimal[] prices = { 210m, 120m, 150m, 90m, 70m };
+            string[] items = { "Cheesecake", "Iced Latte", "Brownie", "Americano", "Filter Coffee", "Siyah Çay", "Kruvasan", "Tostlar" };
+            decimal[] prices = { 210m, 120m, 150m, 90m, 70m, 75m, 80m, 125m };
             string[] paymentMethods = { "QR", "Cash", "POS" };
             
-            for (int i = 0; i < 150; i++)
+            // Seed 350 receipts over the last 30 days
+            for (int i = 0; i < 350; i++)
             {
                 var table = tables[random.Next(tables.Count)];
-                // Spread across today 10:00 AM to 22:00 PM
-                var openedAt = DateTime.UtcNow.Date.AddHours(10).AddMinutes(random.Next(0, 12 * 60));
+                
+                // Random day offset from today (0 to 30)
+                var dayOffset = random.Next(0, 31);
+                
+                // Spread across 10:00 AM to 22:00 PM for that day
+                var openedAt = DateTime.UtcNow.Date.AddDays(-dayOffset).AddHours(10).AddMinutes(random.Next(0, 12 * 60));
                 var closedAt = openedAt.AddMinutes(random.Next(20, 120));
                 
                 var receipt = new Receipt

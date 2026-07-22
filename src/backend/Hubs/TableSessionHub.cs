@@ -60,12 +60,27 @@ public class TableSessionHub : Hub
     public async Task SelectItemToPay(string tableId, int itemId, string userId)
     {
         var item = await _context.BillItems.FindAsync(itemId);
-        if (item != null && string.IsNullOrEmpty(item.LockedByUserId))
+        if (item != null && (string.IsNullOrEmpty(item.LockedByUserId) || item.LockedUntil < DateTime.UtcNow))
         {
             item.LockedByUserId = userId;
+            item.LockedUntil = DateTime.UtcNow.AddMinutes(3);
             await _context.SaveChangesAsync();
 
-            await Clients.Group(tableId).SendAsync("ItemLocked", itemId, userId);
+            await Clients.Group(tableId).SendAsync("ItemLocked", itemId, userId, item.LockedUntil);
+            await Clients.Group("Admin").SendAsync("AdminTableUpdated", tableId);
+        }
+    }
+
+    public async Task UnselectItemToPay(string tableId, int itemId, string userId)
+    {
+        var item = await _context.BillItems.FindAsync(itemId);
+        if (item != null && item.LockedByUserId == userId)
+        {
+            item.LockedByUserId = null;
+            item.LockedUntil = null;
+            await _context.SaveChangesAsync();
+
+            await Clients.Group(tableId).SendAsync("ItemUnlocked", itemId);
             await Clients.Group("Admin").SendAsync("AdminTableUpdated", tableId);
         }
     }

@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Banknote, TrendingUp, TrendingDown, Wallet, Clock, AlertTriangle, Coins, Loader } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend
+  AreaChart, Area, PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend,
+  LineChart, Line
 } from 'recharts';
 import { getDailySummary } from '../services/api';
 
@@ -243,24 +244,24 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Income vs Expenses Chart */}
+        {/* Daily Revenue Chart */}
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col">
-          <h3 className="text-lg font-bold text-gray-900 mb-6">{t('Income vs Expenses')}</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-6">{t('Günlük Ciro Grafiği')}</h3>
           <div className="flex-1 w-full h-full min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.incomeExpensesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <LineChart data={data.incomeExpensesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5EA" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#8E8E93', fontSize: 12 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#8E8E93', fontSize: 12 }} />
                 <Tooltip
-                  cursor={{ fill: '#F2F2F7' }}
+                  cursor={{ fill: '#F2F2F7', strokeWidth: 1, strokeDasharray: '3 3' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number) => `₺${value.toLocaleString()}`}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar dataKey="Revenue" name={t('Revenue')} fill="#10B981" radius={[6, 6, 0, 0]} barSize={60} />
-                <Bar dataKey="Expenses" name={t('Expenses')} fill="#EF4444" radius={[6, 6, 0, 0]} barSize={60} />
-              </BarChart>
+                <Line type="monotone" dataKey="Revenue" name={t('Revenue')} stroke="#10B981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="Expenses" name={t('Expenses')} stroke="#EF4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

@@ -11,6 +11,7 @@ public class BillItem
     public bool IsPaid { get; set; }
     public string? PaidByUserId { get; set; }
     public string? LockedByUserId { get; set; }
+    public DateTime? LockedUntil { get; set; }
     public string TableSessionId { get; set; } = string.Empty;
     
     [JsonIgnore]

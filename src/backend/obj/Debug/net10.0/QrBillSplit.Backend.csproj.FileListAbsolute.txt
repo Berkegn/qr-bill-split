@@ -140,3 +140,4 @@
 /Users/berkeeyigun/qr-bill-split/src/backend/bin/Debug/net10.0/runtimes/win/lib/net6.0/Microsoft.Win32.SystemEvents.dll
 /Users/berkeeyigun/qr-bill-split/src/backend/bin/Debug/net10.0/runtimes/unix/lib/net6.0/System.Drawing.Common.dll
 /Users/berkeeyigun/qr-bill-split/src/backend/bin/Debug/net10.0/runtimes/win/lib/net6.0/System.Drawing.Common.dll
+/Users/berkeeyigun/qr-bill-split/src/backend/obj/Debug/net10.0/QrBillSplit.Backend.sourcelink.json
