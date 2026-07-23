@@ -1,3 +1,7 @@
+using System;
+using System.Threading.Tasks;
+using QrBillSplit.Backend.Core.Interfaces;
+
 namespace QrBillSplit.Backend.Services;
 
 public class EmailOtpSender : IOtpSender

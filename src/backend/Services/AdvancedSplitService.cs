@@ -1,8 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
-using QrBillSplit.Backend.Data;
-using QrBillSplit.Backend.Models;
-using QrBillSplit.Backend.Hubs;
+using QrBillSplit.Backend.Infrastructure.Data;
+using QrBillSplit.Backend.Core.Models;
+using QrBillSplit.Backend.Services.Hubs;
+using QrBillSplit.Backend.Core.Interfaces;
+using QrBillSplit.Backend.Core.DTOs;
+using QrBillSplit.Backend.Core.Exceptions;
+
 
 namespace QrBillSplit.Backend.Services;
 
