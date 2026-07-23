@@ -23,6 +23,23 @@ public class TableSessionHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, tableId);
     }
 
+    public async Task OccupyTable(Guid tableId, string occupantName)
+    {
+        var table = await _context.RestaurantTables.FindAsync(tableId);
+        if (table != null)
+        {
+            table.Status = 1; // Occupied
+            if (!table.Occupants.Contains(occupantName))
+            {
+                table.Occupants.Add(occupantName);
+            }
+            table.IsOccupied = true;
+            await _context.SaveChangesAsync();
+
+            await Clients.All.SendAsync("TableStatusUpdated", table);
+        }
+    }
+
     public async Task JoinStaffGroup()
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, "Staff");

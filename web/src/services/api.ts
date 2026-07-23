@@ -12,8 +12,8 @@ export const getTables = async () => {
   return response.data;
 };
 
-export const createTable = async () => {
-  const response = await api.post('/b2b/tables');
+export const createTable = async (tableName?: string) => {
+  const response = await api.post('/b2b/tables', { tableNumber: tableName });
   return response.data;
 };
 
@@ -38,6 +38,28 @@ export const addPosItem = async (sessionId: string, itemData: { name: string, pr
 
 export const getDailySummary = async (period: string = 'daily') => {
   const response = await api.get(`/analytics/daily-summary?period=${period}`);
+  return response.data;
+};
+
+// --- Products API ---
+
+export const getProducts = async () => {
+  const response = await api.get('/products');
+  return response.data;
+};
+
+export const addProduct = async (productData: { name: string, category: string, price: number }) => {
+  const response = await api.post('/products', productData);
+  return response.data;
+};
+
+export const updateProduct = async (id: string, productData: { name: string, category: string, price: number }) => {
+  const response = await api.put(`/products/${id}`, productData);
+  return response.data;
+};
+
+export const deleteProduct = async (id: string) => {
+  const response = await api.delete(`/products/${id}`);
   return response.data;
 };
 

@@ -28,14 +28,15 @@ public class B2bTablesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateTable()
+    public async Task<IActionResult> CreateTable([FromBody] CreateTableRequest request)
     {
         var count = await _context.RestaurantTables.CountAsync();
         var newTable = new RestaurantTable
         {
-            TableNumber = $"Table {count + 1}",
+            TableNumber = string.IsNullOrWhiteSpace(request?.TableNumber) ? $"Table {count + 1}" : request.TableNumber,
             SessionId = Guid.NewGuid(),
-            IsOccupied = false
+            IsOccupied = false,
+            Status = 0
         };
 
         _context.RestaurantTables.Add(newTable);
@@ -103,4 +104,9 @@ public class AddPosItemRequest
     public string Name { get; set; } = string.Empty;
     public decimal Price { get; set; }
     public int Quantity { get; set; } = 1;
+}
+
+public class CreateTableRequest
+{
+    public string? TableNumber { get; set; }
 }

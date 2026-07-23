@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react';
-import { getTables, getTableQrUrl, deleteTable, getTableSession, addPosItem } from '../services/api';
-import { Plus, Download, QrCode as QrCodeIcon, X, Trash2, Edit3 } from 'lucide-react';
+import { getTables, createTable, getTableQrUrl, deleteTable, getTableSession, addPosItem } from '../services/api';
+import { Plus, Download, QrCode as QrCodeIcon, X, Trash2 } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import TableQrDocument from '../components/TableQrDocument';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
+import { HubConnectionBuilder } from '@microsoft/signalr';
 
 interface RestaurantTable {
   id: string;
   tableNumber: string;
   sessionId: string;
   isOccupied: boolean;
+  status: number;
+  occupants?: string[];
 }
 
 const Tables = () => {
   const { t } = useTranslation();
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('All');
   
   // Modals state
   const [selectedTableForQr, setSelectedTableForQr] = useState<RestaurantTable | null>(null);
@@ -48,21 +52,47 @@ const Tables = () => {
     }
   };
 
+  useEffect(() => {
+    const connection = new HubConnectionBuilder()
+      .withUrl('http://localhost:5079/tablehub')
+      .withAutomaticReconnect()
+      .build();
+
+    connection.start()
+      .then(() => {
+        console.log('Connected to Table Hub');
+        connection.invoke('JoinAdminGroup');
+      })
+      .catch(err => console.error('SignalR Connection Error: ', err));
+
+    connection.on('TableStatusUpdated', (updatedTable: RestaurantTable) => {
+      setTables(prevTables => prevTables.map(t => t.id === updatedTable.id ? updatedTable : t));
+    });
+
+    return () => {
+      connection.stop();
+    };
+  }, []);
+
   const handleAddTable = async () => {
     setIsModalOpen(true);
   };
 
-  const handleModalSubmit = () => {
+  const handleModalSubmit = async () => {
     if (!tableNameInput.trim()) return;
     
-    const newTable: RestaurantTable = {
-      id: Math.random().toString(36).substring(2, 9),
-      tableNumber: tableNameInput,
-      sessionId: Math.random().toString(36).substring(2, 9),
-      isOccupied: false
-    };
+    try {
+      const data = await createTable(tableNameInput.trim());
+      if (data.success) {
+        await fetchTables();
+      } else {
+        alert('Failed to create table. Backend returned error.');
+      }
+    } catch (e) {
+      console.error('Failed to create table', e);
+      alert('Failed to connect to backend API. Is the server running?');
+    }
     
-    setTables([...tables, newTable]);
     setIsModalOpen(false);
     setTableNameInput('');
   };
@@ -145,6 +175,17 @@ const Tables = () => {
     }
   };
 
+  const filteredTables = tables.filter((table) => {
+    let actualStatus = table.status;
+    if (table.occupants && table.occupants.length > 0 && actualStatus === 0) actualStatus = 1;
+
+    if (filter === 'All') return true;
+    if (filter === 'Available' && actualStatus === 0) return true;
+    if (filter === 'Occupied' && actualStatus === 1) return true;
+    if (filter === 'Reserved' && actualStatus === 2) return true;
+    return false;
+  });
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex justify-between items-center mb-8">
@@ -159,6 +200,27 @@ const Tables = () => {
           <Plus size={18} />
           {t('Add New Table')}
         </button>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+        {[
+          { id: 'All', label: 'Tümü', activeClass: 'bg-gray-800 text-white' },
+          { id: 'Available', label: 'Müsait', activeClass: 'bg-emerald-500 text-white' },
+          { id: 'Occupied', label: 'Dolu', activeClass: 'bg-rose-500 text-white' },
+          { id: 'Reserved', label: 'Rezerve', activeClass: 'bg-amber-500 text-white' }
+        ].map((opt) => (
+          <button
+            key={opt.id}
+            onClick={() => setFilter(opt.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === opt.id
+              ? `${opt.activeClass} shadow-sm`
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -181,21 +243,49 @@ const Tables = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {tables.map((table) => (
-            <div key={table.id} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group/card">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-full -z-0"></div>
+          {filteredTables.map((table) => {
+            let actualStatus = table.status;
+            if (table.occupants && table.occupants.length > 0 && actualStatus === 0) actualStatus = 1;
+
+            let cardBgClass = 'bg-emerald-50 border-emerald-200';
+            let badgeClass = 'bg-emerald-100 text-emerald-800';
+            let badgeText = t('Available');
+
+            if (actualStatus === 1) {
+              cardBgClass = 'bg-rose-50 border-rose-200';
+              badgeClass = 'bg-rose-100 text-rose-800';
+              badgeText = t('Occupied');
+            } else if (actualStatus === 2) {
+              cardBgClass = 'bg-amber-50 border-amber-200';
+              badgeClass = 'bg-amber-100 text-amber-800';
+              badgeText = t('Reserved');
+            }
+
+            return (
+            <div key={table.id} className={`rounded-2xl p-6 border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group/card ${cardBgClass}`}>
+              <div className="absolute top-0 right-0 w-16 h-16 bg-white/40 rounded-bl-full -z-0"></div>
               
               <div className="flex justify-between items-start mb-6 relative z-10">
                 <div 
-                  className="cursor-pointer group/title" 
+                  className="cursor-pointer group/title flex-1" 
                   onClick={() => openPosSimulator(table)}
                 >
-                  <h3 className="text-lg font-bold text-gray-900 group-hover/title:text-primary transition-colors flex items-center gap-2">
-                    {table.tableNumber}
-                    <Edit3 size={16} className="text-gray-300 group-hover/title:text-primary transition-colors" />
-                  </h3>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-2 ${table.isOccupied ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                    {table.isOccupied ? t('Occupied') : t('Available')}
+                  <div className="flex flex-col items-start gap-1">
+                    <h3 className="text-2xl font-black text-gray-900 group-hover/title:text-primary transition-colors flex items-center gap-2 tracking-tight">
+                      {table.tableNumber}
+                    </h3>
+                    {table.occupants && table.occupants.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {table.occupants.map((occ, idx) => (
+                          <span key={idx} className="bg-white/60 text-gray-800 text-xs font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm border border-white/50 flex items-center shadow-sm">
+                            <span className="mr-1">👤</span> {occ}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold mt-3 shadow-sm ${badgeClass}`}>
+                    {badgeText}
                   </span>
                   <p className="text-xs text-primary mt-2 font-medium opacity-0 group-hover/title:opacity-100 transition-opacity">
                     Manage Order &rarr;
@@ -240,7 +330,7 @@ const Tables = () => {
                 </PDFDownloadLink>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 

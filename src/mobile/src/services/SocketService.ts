@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 // For local testing on iOS simulator, localhost is fine. 
 // For Android emulator it would be 10.0.2.2.
-const HUB_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5079/tablehub' : 'http://localhost:5079/tablehub';
+const HUB_URL = 'http://192.168.102.41:5079/tablehub';
 
 class SocketService {
   private connection: signalR.HubConnection | null = null;
@@ -25,6 +25,12 @@ class SocketService {
   public async joinTable(tableId: string) {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       await this.connection.invoke('JoinTableGroup', tableId);
+    }
+  }
+
+  public async occupyTable(tableId: string, occupantName: string) {
+    if (this.connection?.state === signalR.HubConnectionState.Connected) {
+      await this.connection.invoke('OccupyTable', tableId, occupantName);
     }
   }
 

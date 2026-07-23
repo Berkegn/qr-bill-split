@@ -63,7 +63,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-8 pb-8 animate-in fade-in duration-300">
+    <div className="min-h-full flex flex-col space-y-8 pb-24 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('Dashboard Analytics')}</h1>
@@ -256,7 +256,7 @@ const Dashboard = () => {
                 <Tooltip
                   cursor={{ fill: '#F2F2F7', strokeWidth: 1, strokeDasharray: '3 3' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => `₺${value.toLocaleString()}`}
+                  formatter={(value: any) => `₺${value.toLocaleString()}`}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                 <Line type="monotone" dataKey="Revenue" name={t('Revenue')} stroke="#10B981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
@@ -291,7 +291,7 @@ const Dashboard = () => {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => `₺${value.toLocaleString()}`}
+                  formatter={(value: any) => `₺${value.toLocaleString()}`}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
                 <Legend verticalAlign="bottom" iconType="circle" />
@@ -324,7 +324,7 @@ const Dashboard = () => {
                   cornerRadius={10}
                 />
                 <Tooltip
-                  formatter={(value: number) => `${value}%`}
+                  formatter={(value: any) => `${value}%`}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
               </RadialBarChart>
@@ -354,7 +354,7 @@ const Dashboard = () => {
                 <Tooltip
                   cursor={{ fill: '#F2F2F7' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number, name: string) => [
+                  formatter={(value: any, name: any) => [
                     name === 'revenue' ? `₺${value.toLocaleString()}` : value,
                     name === 'revenue' ? t('Revenue') : t('Sales')
                   ]}

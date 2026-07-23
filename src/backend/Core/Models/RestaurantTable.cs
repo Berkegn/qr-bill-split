@@ -12,4 +12,6 @@ public class RestaurantTable
     public string TableNumber { get; set; } = string.Empty;
     public Guid SessionId { get; set; }
     public bool IsOccupied { get; set; } = false;
+    public int Status { get; set; } = 0; // 0 = Available, 1 = Occupied, 2 = Reserved
+    public List<string> Occupants { get; set; } = new();
 }

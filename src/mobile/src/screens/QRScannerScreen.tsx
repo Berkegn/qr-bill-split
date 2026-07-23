@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Props {
   onScanSuccess: (tableId: string) => void;
@@ -16,6 +18,9 @@ interface Props {
 export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, onBack }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [showAuthSheet, setShowAuthSheet] = useState(false);
+  const [scannedTableId, setScannedTableId] = useState<string | null>(null);
+  const [guestNameInput, setGuestNameInput] = useState('');
 
   // If permission is loading
   if (!permission) {
@@ -42,27 +47,53 @@ export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, o
     );
   }
 
-  const handleBarCodeScanned = async ({ type, data }: { type: string, data: string }) => {
-    if (scanned) return;
-    
-    Alert.alert('Table Scanned!', `Data: ${data}`, [
-      { 
-        text: 'Join Table', 
-        onPress: () => {
-          const parsedTableId = data.startsWith('qrbillsplit://table/') 
-            ? data.split('qrbillsplit://table/')[1] 
-            : data;
-          setScanned(true);
-          onScanSuccess(parsedTableId);
-        }
+  const checkAuthAndJoin = async (tableId: string) => {
+    try {
+      const token = await SecureStore.getItemAsync('jwt_token');
+      if (token) {
+        onScanSuccess(tableId);
+        return;
       }
-    ]);
+      
+      const storedName = await AsyncStorage.getItem('guest_name');
+      if (storedName) {
+        onScanSuccess(tableId);
+        return;
+      }
+      
+      setScannedTableId(tableId);
+      setShowAuthSheet(true);
+    } catch (e) {
+      console.warn("Auth check failed", e);
+      setScannedTableId(tableId);
+      setShowAuthSheet(true);
+    }
+  };
+
+  const handleBarCodeScanned = async ({ type, data }: { type: string, data: string }) => {
+    if (scanned || showAuthSheet) return;
+    
+    const parsedTableId = data.startsWith('qrbillsplit://table/') 
+      ? data.split('qrbillsplit://table/')[1] 
+      : data;
+      
+    setScanned(true);
+    checkAuthAndJoin(parsedTableId);
   };
 
   const handleSimulatedScan = () => {
-    if (scanned) return;
+    if (scanned || showAuthSheet) return;
     setScanned(true);
-    onScanSuccess('table-5');
+    checkAuthAndJoin('f15977cf-1cba-4528-ae23-70fe07f881e6'); // Specific table ID or just table-5
+  };
+
+  const submitGuestName = async () => {
+    if (!guestNameInput.trim()) return;
+    await AsyncStorage.setItem('guest_name', guestNameInput.trim());
+    setShowAuthSheet(false);
+    if (scannedTableId) {
+      onScanSuccess(scannedTableId);
+    }
   };
 
   return (
@@ -140,6 +171,47 @@ export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, o
           </TouchableOpacity>
         </BlurView>
       </SafeAreaView>
+
+      {/* Guest Auth Bottom Sheet */}
+      <Modal visible={showAuthSheet} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackground}>
+          <View style={{ flex: 1 }} />
+          <View style={styles.bottomSheet}>
+            <View style={styles.dragIndicator} />
+            <Text style={styles.sheetTitle}>Masaya Hoş Geldiniz! 👋</Text>
+            <Text style={styles.sheetSub}>Masadakilerin sizi tanıyabilmesi için lütfen isminizi girin.</Text>
+            
+            <TextInput
+              style={styles.nameInput}
+              placeholder="İsminiz (örn. Berke)"
+              placeholderTextColor="#8E8E93"
+              value={guestNameInput}
+              onChangeText={setGuestNameInput}
+              autoFocus
+              maxLength={20}
+            />
+            
+            <TouchableOpacity 
+              style={[styles.sheetButton, !guestNameInput.trim() && { opacity: 0.5 }]} 
+              onPress={submitGuestName}
+              disabled={!guestNameInput.trim()}
+            >
+              <Text style={styles.sheetButtonText}>Masaya Katıl</Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFF" style={{marginLeft: 8}} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.sheetCancel} 
+              onPress={() => {
+                setShowAuthSheet(false);
+                setScanned(false);
+              }}
+            >
+              <Text style={styles.sheetCancelText}>Vazgeç</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -297,5 +369,74 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  bottomSheet: {
+    backgroundColor: '#1C1C1E',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 48 : 24,
+    alignItems: 'center',
+  },
+  dragIndicator: {
+    width: 40,
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    marginBottom: 24,
+  },
+  sheetTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  sheetSub: {
+    fontSize: 15,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  nameInput: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  sheetButton: {
+    backgroundColor: '#0A84FF',
+    flexDirection: 'row',
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheetButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  sheetCancel: {
+    marginTop: 20,
+    padding: 10,
+  },
+  sheetCancelText: {
+    color: '#8E8E93',
+    fontSize: 16,
+    fontWeight: '600',
   }
 });

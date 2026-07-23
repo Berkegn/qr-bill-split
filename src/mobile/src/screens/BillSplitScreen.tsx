@@ -6,10 +6,11 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SocketService from '../services/SocketService';
 import OfflineQueueService from '../services/OfflineQueueService';
 
-const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5079/api' : 'http://localhost:5079/api';
+const BASE_URL = 'http://192.168.102.41:5079/api';
 
 type BillItemType = {
   uniqueId: string;
@@ -94,8 +95,17 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
       fetchTableData();
       fetchMenu();
       
-      SocketService.connect();
-      SocketService.joinTable(tableId);
+      SocketService.connect().then(async () => {
+        await SocketService.joinTable(tableId);
+        
+        // Notify backend that this user joined
+        try {
+          const guestName = await AsyncStorage.getItem('guest_name') || 'Misafir';
+          await SocketService.occupyTable(tableId, guestName);
+        } catch (e) {
+          console.warn('Failed to occupy table', e);
+        }
+      });
       
       SocketService.on('OrderUpdated', fetchTableData);
       SocketService.on('ItemLocked', fetchTableData);
