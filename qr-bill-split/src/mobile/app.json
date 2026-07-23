@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "QR Bill Split",
+    "slug": "qr-bill-split",
+    "version": "1.0.0",
+    "scheme": "qrbillsplit",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "display": "standalone",
+      "themeColor": "#007AFF",
+      "backgroundColor": "#ffffff"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Adisyon QR kodunu taramak için kamera izni gerekiyor."
+        }
+      ]
+    ]
+  }
+}
