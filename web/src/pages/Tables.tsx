@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getTables, createTable, getTableQrUrl, deleteTable, getTableSession, addPosItem } from '../services/api';
+import { getTables, createTable, getTableQrUrl, deleteTable, addPosItem, getOrders } from '../services/api';
 import { Plus, Download, QrCode as QrCodeIcon, X, Trash2 } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import TableQrDocument from '../components/TableQrDocument';
@@ -115,12 +115,10 @@ const Tables = () => {
     setPosItems([]);
     setPosLoading(true);
     try {
-      const session = await getTableSession(table.sessionId);
-      if (session && session.billItems) {
+      const data = await getOrders(table.id);
+      if (data && data.orders) {
         // Map BillItems to a format suitable for POS display
-        // Since backend has atomic items without quantity, we can group them by name/price or just list them
-        // Let's group them by name and price
-        const groupedItems = session.billItems.reduce((acc: any[], item: any) => {
+        const groupedItems = data.orders.reduce((acc: any[], item: any) => {
           const existing = acc.find(i => i.name === item.name && i.price === item.price);
           if (existing) {
             existing.qty += 1;

@@ -7,15 +7,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiAgent } from '../data/agent/apiAgent';
 
 interface Props {
   onScanSuccess: (tableId: string) => void;
   onB2BAuth: () => void;
   onProfile: () => void;
+  onMenu: () => void;
   onBack?: () => void;
 }
 
-export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, onBack }: Props) {
+export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, onMenu, onBack }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [showAuthSheet, setShowAuthSheet] = useState(false);
@@ -89,10 +91,18 @@ export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, o
 
   const submitGuestName = async () => {
     if (!guestNameInput.trim()) return;
-    await AsyncStorage.setItem('guest_name', guestNameInput.trim());
-    setShowAuthSheet(false);
-    if (scannedTableId) {
-      onScanSuccess(scannedTableId);
+    try {
+      if (scannedTableId) {
+        await apiAgent.post(`/tables/${scannedTableId}/occupy`, { participantName: guestNameInput.trim() });
+      }
+      await AsyncStorage.setItem('guest_name', guestNameInput.trim());
+      setShowAuthSheet(false);
+      if (scannedTableId) {
+        onScanSuccess(scannedTableId);
+      }
+    } catch (e: any) {
+      console.warn("Failed to occupy table", e);
+      Alert.alert("Hata", "Masaya katılamadık. Lütfen bağlantınızı kontrol edin.");
     }
   };
 
@@ -137,6 +147,11 @@ export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, o
           </View>
           
           <View style={styles.headerButtons}>
+            <TouchableOpacity onPress={onMenu} style={styles.iconButton}>
+              <BlurView intensity={40} tint="dark" style={styles.iconButtonBlur}>
+                <Ionicons name="restaurant-outline" size={20} color="#FFF" />
+              </BlurView>
+            </TouchableOpacity>
             <TouchableOpacity onPress={onB2BAuth} style={styles.iconButton}>
               <BlurView intensity={40} tint="dark" style={styles.iconButtonBlur}>
                 <Ionicons name="business" size={20} color="#FFF" />

@@ -11,10 +11,11 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OtpScreen from './src/screens/OtpScreen';
+import MenuScreen from './src/presentation/screens/MenuScreen';
 import { ReceiptResponse } from './src/types';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import * as Linking from 'expo-linking';
-type ScreenState = 'Scanner' | 'Bill' | 'B2BAuth' | 'B2BDashboard' | 'Settings' | 'Receipt' | 'Login' | 'Register' | 'Profile' | 'Otp';
+type ScreenState = 'Scanner' | 'Bill' | 'B2BAuth' | 'B2BDashboard' | 'Settings' | 'Receipt' | 'Login' | 'Register' | 'Profile' | 'Otp' | 'Menu';
 
 function MainApp() {
   const { user, isLoading } = useAuth();
@@ -105,7 +106,19 @@ function MainApp() {
       onScanSuccess={handleScanSuccess}
       onB2BAuth={() => setCurrentScreen('B2BAuth')}
       onProfile={() => setCurrentScreen('Profile')}
+      onMenu={() => setCurrentScreen('Menu')}
     />;
+  }
+
+  if (currentScreen === 'Menu') {
+    return (
+      <View style={{flex:1}}>
+        <TouchableOpacity style={{position:'absolute', top: 50, left: 20, zIndex:10, backgroundColor: '#fff', padding: 10, borderRadius: 8, shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity: 0.2, shadowRadius: 4}} onPress={() => setCurrentScreen('Scanner')}>
+          <Text style={{fontWeight: 'bold', color: '#0A84FF'}}>Geri Dön</Text>
+        </TouchableOpacity>
+        <MenuScreen />
+      </View>
+    );
   }
 
   if (currentScreen === 'Receipt' && receiptData) {

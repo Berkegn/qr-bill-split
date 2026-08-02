@@ -36,6 +36,11 @@ export const addPosItem = async (sessionId: string, itemData: { name: string, pr
   return response.data;
 };
 
+export const getOrders = async (tableId: string) => {
+  const response = await api.get(`/tables/${tableId}/orders`);
+  return response.data;
+};
+
 export const getDailySummary = async (period: string = 'daily') => {
   const response = await api.get(`/analytics/daily-summary?period=${period}`);
   return response.data;

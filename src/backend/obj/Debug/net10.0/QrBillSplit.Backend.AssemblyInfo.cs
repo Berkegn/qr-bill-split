@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("QrBillSplit.Backend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+219f676db4862961b194894b72b46aa773ed2ce3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2874757dc732a97c57517de405855da22eeb9216")]
 [assembly: System.Reflection.AssemblyProductAttribute("QrBillSplit.Backend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("QrBillSplit.Backend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
