@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SocketService from '../services/SocketService';
 import OfflineQueueService from '../services/OfflineQueueService';
 
-const BASE_URL = 'http://192.168.102.41:5079/api';
+const BASE_URL = 'http://192.168.111.2:5079/api';
 
 type BillItemType = {
   uniqueId: string;
@@ -73,9 +73,8 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
         } else {
           setItems([]);
         }
-      } catch (error) {
-        console.error("Failed to fetch table data", error);
-        // Silently handle error or show alert, for now let's just leave it empty if failed
+      } catch (error: any) {
+        console.error("Failed to fetch table data", error.message || error);
         setItems([]);
       } finally {
         setIsLoadingItems(false);
