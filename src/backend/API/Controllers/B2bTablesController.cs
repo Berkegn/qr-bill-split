@@ -52,6 +52,30 @@ public class B2bTablesController : ControllerBase
         if (table == null)
             return NotFound("Table not found.");
 
+        // Clean up receipts and their order items
+        var receipts = await _context.Receipts.Where(r => r.TableId == id).ToListAsync();
+        if (receipts.Any())
+        {
+            var receiptIds = receipts.Select(r => r.Id).ToList();
+            var orderItems = await _context.OrderItems.Where(oi => receiptIds.Contains(oi.ReceiptId)).ToListAsync();
+            _context.OrderItems.RemoveRange(orderItems);
+            _context.Receipts.RemoveRange(receipts);
+        }
+
+        // Clean up table sessions and their bill items / participants
+        var sessionId = table.SessionId.ToString();
+        var sessions = await _context.TableSessions
+            .Include(s => s.BillItems)
+            .Include(s => s.Participants)
+            .Where(s => s.Id == sessionId || s.TableId == id)
+            .ToListAsync();
+        foreach (var session in sessions)
+        {
+            _context.BillItems.RemoveRange(session.BillItems);
+            _context.Participants.RemoveRange(session.Participants);
+        }
+        _context.TableSessions.RemoveRange(sessions);
+
         _context.RestaurantTables.Remove(table);
         await _context.SaveChangesAsync();
 

@@ -49,61 +49,22 @@ export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, o
     );
   }
 
-  const checkAuthAndJoin = async (tableId: string) => {
-    try {
-      const token = await SecureStore.getItemAsync('jwt_token');
-      if (token) {
-        onScanSuccess(tableId);
-        return;
-      }
-      
-      const storedName = await AsyncStorage.getItem('guest_name');
-      if (storedName) {
-        onScanSuccess(tableId);
-        return;
-      }
-      
-      setScannedTableId(tableId);
-      setShowAuthSheet(true);
-    } catch (e) {
-      console.warn("Auth check failed", e);
-      setScannedTableId(tableId);
-      setShowAuthSheet(true);
-    }
-  };
-
   const handleBarCodeScanned = async ({ type, data }: { type: string, data: string }) => {
-    if (scanned || showAuthSheet) return;
+    if (scanned) return;
     
     const parsedTableId = data.startsWith('qrbillsplit://table/') 
       ? data.split('qrbillsplit://table/')[1] 
       : data;
       
     setScanned(true);
-    checkAuthAndJoin(parsedTableId);
+    onScanSuccess(parsedTableId);
   };
 
   const handleSimulatedScan = () => {
-    if (scanned || showAuthSheet) return;
+    if (scanned) return;
     setScanned(true);
-    checkAuthAndJoin('f15977cf-1cba-4528-ae23-70fe07f881e6'); // Specific table ID or just table-5
-  };
-
-  const submitGuestName = async () => {
-    if (!guestNameInput.trim()) return;
-    try {
-      if (scannedTableId) {
-        await apiAgent.post(`/tables/${scannedTableId}/occupy`, { participantName: guestNameInput.trim() });
-      }
-      await AsyncStorage.setItem('guest_name', guestNameInput.trim());
-      setShowAuthSheet(false);
-      if (scannedTableId) {
-        onScanSuccess(scannedTableId);
-      }
-    } catch (e: any) {
-      console.warn("Failed to occupy table", e);
-      Alert.alert("Hata", "Masaya katılamadık. Lütfen bağlantınızı kontrol edin.");
-    }
+    // Use the stable predictable GUID for Masa 5 from DbSeeder
+    onScanSuccess('a0000000-0000-0000-0000-000000000005');
   };
 
   return (
@@ -187,46 +148,7 @@ export default function QRScannerScreen({ onScanSuccess, onB2BAuth, onProfile, o
         </BlurView>
       </SafeAreaView>
 
-      {/* Guest Auth Bottom Sheet */}
-      <Modal visible={showAuthSheet} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackground}>
-          <View style={{ flex: 1 }} />
-          <View style={styles.bottomSheet}>
-            <View style={styles.dragIndicator} />
-            <Text style={styles.sheetTitle}>Masaya Hoş Geldiniz! 👋</Text>
-            <Text style={styles.sheetSub}>Masadakilerin sizi tanıyabilmesi için lütfen isminizi girin.</Text>
-            
-            <TextInput
-              style={styles.nameInput}
-              placeholder="İsminiz (örn. Berke)"
-              placeholderTextColor="#8E8E93"
-              value={guestNameInput}
-              onChangeText={setGuestNameInput}
-              autoFocus
-              maxLength={20}
-            />
-            
-            <TouchableOpacity 
-              style={[styles.sheetButton, !guestNameInput.trim() && { opacity: 0.5 }]} 
-              onPress={submitGuestName}
-              disabled={!guestNameInput.trim()}
-            >
-              <Text style={styles.sheetButtonText}>Masaya Katıl</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFF" style={{marginLeft: 8}} />
-            </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.sheetCancel} 
-              onPress={() => {
-                setShowAuthSheet(false);
-                setScanned(false);
-              }}
-            >
-              <Text style={styles.sheetCancelText}>Vazgeç</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }

@@ -27,6 +27,7 @@ interface Props {
   userId: string;
   currencySymbol: string;
   onBack: () => void;
+  onMenu?: () => void;
   onCheckoutSuccess?: (receipt: any) => void;
   navigation?: any;
 }
@@ -35,7 +36,7 @@ interface Props {
 
 type SplitMode = 'equal' | 'itemized';
 
-export default function BillSplitScreen({ tableId, userId, currencySymbol, onBack, onCheckoutSuccess, navigation }: Props) {
+export default function BillSplitScreen({ tableId, userId, currencySymbol, onBack, onMenu, onCheckoutSuccess, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [splitMode, setSplitMode] = useState<SplitMode>('itemized');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -387,7 +388,10 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
       </ScrollView>
 
       <View style={{ position: 'absolute', bottom: 220, right: 20, zIndex: 100, gap: 12 }}>
-        <TouchableOpacity style={styles.fabBtn} onPress={() => setMenuModalVisible(true)}>
+        <TouchableOpacity style={styles.fabBtn} onPress={() => {
+          if (onMenu) onMenu();
+          else setMenuModalVisible(true);
+        }}>
           <Ionicons name="fast-food" size={24} color="#FFF" />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.fabBtn, { backgroundColor: '#FF3B30' }]} onPress={handleCallWaiter}>

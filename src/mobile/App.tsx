@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import QRScannerScreen from './src/screens/QRScannerScreen';
@@ -12,10 +12,11 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OtpScreen from './src/screens/OtpScreen';
 import MenuScreen from './src/presentation/screens/MenuScreen';
+import JoinTableScreen from './src/presentation/screens/JoinTableScreen';
 import { ReceiptResponse } from './src/types';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import * as Linking from 'expo-linking';
-type ScreenState = 'Scanner' | 'Bill' | 'B2BAuth' | 'B2BDashboard' | 'Settings' | 'Receipt' | 'Login' | 'Register' | 'Profile' | 'Otp' | 'Menu';
+type ScreenState = 'Scanner' | 'Bill' | 'B2BAuth' | 'B2BDashboard' | 'Settings' | 'Receipt' | 'Login' | 'Register' | 'Profile' | 'Otp' | 'Menu' | 'JoinTable';
 
 function MainApp() {
   const { user, isLoading } = useAuth();
@@ -24,13 +25,16 @@ function MainApp() {
   const [currencySymbol, setCurrencySymbol] = useState<string>('₺');
   const [receiptData, setReceiptData] = useState<ReceiptResponse | null>(null);
   const [otpEmail, setOtpEmail] = useState<string>('');
+  const [guestUserId, setGuestUserId] = useState<string>('');
+  // Track whether user is "seated" (joined a table) to prevent back to Scanner/JoinTable
+  const [isSeated, setIsSeated] = useState<boolean>(false);
 
   useEffect(() => {
     const handleUrl = (url: string) => {
       if (url.startsWith('qrbillsplit://table/')) {
         const tId = url.split('qrbillsplit://table/')[1];
         setTableId(tId);
-        setCurrentScreen('Bill');
+        setCurrentScreen('JoinTable');
       }
     };
 
@@ -59,7 +63,15 @@ function MainApp() {
 
   const handleScanSuccess = (scannedTableId: string) => {
     setTableId(scannedTableId);
-    setCurrentScreen('Bill');
+    setCurrentScreen('JoinTable');
+  };
+
+  const handleLeaveTable = () => {
+    // Full reset: clear session state and go back to Scanner
+    setIsSeated(false);
+    setTableId('');
+    setGuestUserId('');
+    setCurrentScreen('Scanner');
   };
 
   const handleB2BAuthSuccess = () => {
@@ -110,14 +122,24 @@ function MainApp() {
     />;
   }
 
+  if (currentScreen === 'JoinTable') {
+    return <JoinTableScreen 
+      tableId={tableId} 
+      onJoinSuccess={(newUserId) => {
+        setGuestUserId(newUserId);
+        setIsSeated(true);
+        setCurrentScreen('Bill');
+      }} 
+    />;
+  }
+
   if (currentScreen === 'Menu') {
     return (
-      <View style={{flex:1}}>
-        <TouchableOpacity style={{position:'absolute', top: 50, left: 20, zIndex:10, backgroundColor: '#fff', padding: 10, borderRadius: 8, shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity: 0.2, shadowRadius: 4}} onPress={() => setCurrentScreen('Scanner')}>
-          <Text style={{fontWeight: 'bold', color: '#0A84FF'}}>Geri Dön</Text>
-        </TouchableOpacity>
-        <MenuScreen />
-      </View>
+      <MenuScreen tableId={tableId} onBack={() => {
+        // If seated → go back to Bill (table summary)
+        // If not seated (browsing from Scanner) → go back to Scanner
+        setCurrentScreen(isSeated ? 'Bill' : 'Scanner');
+      }} />
     );
   }
 
@@ -128,6 +150,7 @@ function MainApp() {
       onDone={() => {
         setTableId('');
         setReceiptData(null);
+        setIsSeated(false);
         setCurrentScreen('Scanner');
       }}
     />;
@@ -135,9 +158,10 @@ function MainApp() {
 
   return <BillSplitScreen
     tableId={tableId}
-    userId={user?.id || ''}
+    userId={user?.id || guestUserId || ''}
     currencySymbol={currencySymbol}
-    onBack={() => setCurrentScreen('Scanner')}
+    onBack={handleLeaveTable}
+    onMenu={() => setCurrentScreen('Menu')}
     onCheckoutSuccess={(receipt) => {
       setReceiptData(receipt);
       setCurrentScreen('Receipt');

@@ -53,16 +53,64 @@ public static class DbSeeder
             context.SaveChanges();
         }
 
-        // Seed Tables
-        if (!context.RestaurantTables.Any())
+        // Seed Tables — always ensure exactly 10 stable tables
+        // Predictable GUIDs so mobile simulated scan can reference them
+        var stableTableGuids = new Guid[]
         {
-            var tables = new List<RestaurantTable>();
-            for (int i = 1; i <= 10; i++)
-            {
-                tables.Add(new RestaurantTable { TableNumber = $"Masa {i}", SessionId = Guid.NewGuid() });
-            }
-            context.RestaurantTables.AddRange(tables);
+            Guid.Parse("a0000000-0000-0000-0000-000000000001"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000002"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000003"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000004"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000005"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000006"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000007"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000008"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000009"),
+            Guid.Parse("a0000000-0000-0000-0000-000000000010"),
+        };
+
+        var existingTables = context.RestaurantTables.ToList();
+        // Remove any tables NOT in our stable set
+        var extraTables = existingTables.Where(t => !stableTableGuids.Contains(t.Id)).ToList();
+        if (extraTables.Any())
+        {
+            // Clean receipts referencing extra tables first
+            var extraIds = extraTables.Select(t => t.Id).ToList();
+            var orphanReceipts = context.Receipts.Where(r => extraIds.Contains(r.TableId)).ToList();
+            var orphanOrderItems = context.OrderItems.Where(oi => orphanReceipts.Select(r => r.Id).Contains(oi.ReceiptId)).ToList();
+            context.OrderItems.RemoveRange(orphanOrderItems);
+            context.Receipts.RemoveRange(orphanReceipts);
+            context.RestaurantTables.RemoveRange(extraTables);
             context.SaveChanges();
+        }
+
+        // Add any missing stable tables
+        for (int i = 0; i < 10; i++)
+        {
+            if (!context.RestaurantTables.Any(t => t.Id == stableTableGuids[i]))
+            {
+                context.RestaurantTables.Add(new RestaurantTable
+                {
+                    Id = stableTableGuids[i],
+                    TableNumber = $"Masa {i + 1}",
+                    SessionId = Guid.NewGuid(),
+                    IsOccupied = false,
+                    Status = 0
+                });
+            }
+        }
+        context.SaveChanges();
+
+        // Link the old "table-5" session to Masa 5 if it exists
+        var masa5 = context.RestaurantTables.FirstOrDefault(t => t.Id == stableTableGuids[4]);
+        if (masa5 != null)
+        {
+            var oldSession = context.TableSessions.FirstOrDefault(s => s.Id == "table-5");
+            if (oldSession != null && oldSession.TableId == null)
+            {
+                oldSession.TableId = masa5.Id;
+                context.SaveChanges();
+            }
         }
 
         // Seed Receipts

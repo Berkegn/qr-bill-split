@@ -69,6 +69,31 @@ const Tables = () => {
       setTables(prevTables => prevTables.map(t => t.id === updatedTable.id ? updatedTable : t));
     });
 
+    connection.on('OnTableOccupied', (data: { tableId: string; sessionId: string; status: string; participantName: string; tableNumber: string }) => {
+      console.log('🟢 OnTableOccupied received:', data);
+      setTables(prevTables => prevTables.map(t => {
+        // Match by table ID or sessionId
+        if (t.id === data.tableId || t.sessionId === data.sessionId) {
+          const currentOccupants = t.occupants || [];
+          const newOccupants = currentOccupants.includes(data.participantName)
+            ? currentOccupants
+            : [...currentOccupants, data.participantName];
+          return {
+            ...t,
+            isOccupied: true,
+            status: 1,
+            occupants: newOccupants,
+          };
+        }
+        return t;
+      }));
+    });
+
+    connection.on('AdminTableUpdated', (_tableId: string) => {
+      // Refetch all tables to stay in sync with lock/unlock changes
+      fetchTables();
+    });
+
     return () => {
       connection.stop();
     };

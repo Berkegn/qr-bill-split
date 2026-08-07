@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using QrBillSplit.Backend.Infrastructure.Data;
 using QrBillSplit.Backend.Core.Models;
@@ -6,6 +7,7 @@ using QRCoder;
 using QrBillSplit.Backend.Core.Interfaces;
 using QrBillSplit.Backend.Core.DTOs;
 using QrBillSplit.Backend.Core.Exceptions;
+using QrBillSplit.Backend.Services.Hubs;
 
 
 namespace QrBillSplit.Backend.API.Controllers;
@@ -18,10 +20,12 @@ namespace QrBillSplit.Backend.API.Controllers;
 public class TablesController : ControllerBase
 {
     private readonly IAppDbContext _context;
+    private readonly IHubContext<TableSessionHub> _hubContext;
 
-    public TablesController(IAppDbContext context)
+    public TablesController(IAppDbContext context, IHubContext<TableSessionHub> hubContext)
     {
         _context = context;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -126,9 +130,195 @@ public class TablesController : ControllerBase
         return Ok(new { success = true, orders = session.BillItems });
     }
 
+    [HttpPost("{tableId}/join")]
+    public async Task<IActionResult> JoinTable(string tableId, [FromBody] JoinTableRequest request)
+    {
+        RestaurantTable table = null;
+        if (Guid.TryParse(tableId, out var tableGuid))
+        {
+            table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.Id == tableGuid || t.SessionId == tableGuid);
+        }
+        
+        var existingSession = await _context.TableSessions.FirstOrDefaultAsync(s => s.Id == tableId);
+        
+        if (table == null && existingSession != null && existingSession.TableId.HasValue) 
+        {
+            table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.Id == existingSession.TableId.Value);
+        }
+
+        if (table == null && existingSession == null) 
+            return NotFound(new { success = false, message = "Table not found." });
+
+        if (table != null)
+        {
+            table.Status = 1;
+            table.IsOccupied = true;
+            
+            if (!string.IsNullOrWhiteSpace(request.UserName))
+            {
+                if (table.Occupants == null) table.Occupants = new List<string>();
+                if (!table.Occupants.Contains(request.UserName))
+                    table.Occupants.Add(request.UserName);
+            }
+        }
+
+        var sessionString = table != null ? table.SessionId.ToString() : existingSession.Id;
+        var session = await _context.TableSessions.FirstOrDefaultAsync(s => s.Id == sessionString && s.IsActive);
+        
+        if (session == null && existingSession != null)
+        {
+            session = existingSession;
+            session.IsActive = true;
+        }
+
+        if (session == null)
+        {
+            sessionString = Guid.NewGuid().ToString();
+            if (table != null) table.SessionId = Guid.Parse(sessionString);
+            session = new TableSession
+            {
+                Id = sessionString,
+                TableName = table?.TableNumber ?? "Unknown Table",
+                TableId = table?.Id,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.TableSessions.Add(session);
+        }
+
+        var participant = new Participant
+        {
+            Name = request.UserName,
+            TableSessionId = session.Id,
+            JoinedAt = DateTime.UtcNow
+        };
+        _context.Participants.Add(participant);
+
+        await _context.SaveChangesAsync();
+
+        // Broadcast to all web dashboard clients via SignalR
+        await _hubContext.Clients.All.SendAsync("OnTableOccupied", new 
+        { 
+            TableId = table?.Id.ToString() ?? "",
+            SessionId = session.Id,
+            Status = "Dolu",
+            ParticipantName = request.UserName,
+            TableNumber = table?.TableNumber ?? session.TableName
+        });
+
+        // Also fire existing TableStatusUpdated for backward compat
+        if (table != null)
+        {
+            await _hubContext.Clients.All.SendAsync("TableStatusUpdated", table);
+        }
+        
+        return Ok(new 
+        { 
+            success = true, 
+            sessionId = session.Id, 
+            userId = participant.Id,
+            table = table
+        });
+    }
+
+    [HttpPost("{tableId}/orders")]
+    public async Task<IActionResult> SubmitOrders(string tableId, [FromBody] SubmitOrdersRequest request)
+    {
+        if (request.Items == null || !request.Items.Any())
+            return BadRequest(new { success = false, message = "No items provided." });
+
+        // Resolve the table
+        RestaurantTable? table = null;
+        if (Guid.TryParse(tableId, out var tableGuid))
+        {
+            table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.Id == tableGuid || t.SessionId == tableGuid);
+        }
+
+        // Resolve session
+        string sessionId;
+        TableSession? session = null;
+
+        if (table != null)
+        {
+            sessionId = table.SessionId.ToString();
+            session = await _context.TableSessions
+                .Include(s => s.BillItems)
+                .FirstOrDefaultAsync(s => s.Id == sessionId);
+        }
+        else
+        {
+            session = await _context.TableSessions
+                .Include(s => s.BillItems)
+                .FirstOrDefaultAsync(s => s.Id == tableId);
+            sessionId = tableId;
+        }
+
+        if (session == null)
+        {
+            sessionId = table != null ? table.SessionId.ToString() : Guid.NewGuid().ToString();
+            session = new TableSession
+            {
+                Id = sessionId,
+                TableName = table?.TableNumber ?? "Unknown Table",
+                TableId = table?.Id,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.TableSessions.Add(session);
+        }
+
+        // Add items as BillItems
+        foreach (var item in request.Items)
+        {
+            for (int i = 0; i < item.Quantity; i++)
+            {
+                var billItem = new BillItem
+                {
+                    Name = item.Name,
+                    Price = item.Price,
+                    TableSessionId = session.Id,
+                    IsPaid = false,
+                    AmountPaid = 0m
+                };
+                session.BillItems.Add(billItem);
+                session.TotalAmount += item.Price;
+            }
+        }
+
+        if (table != null)
+        {
+            table.IsOccupied = true;
+            table.Status = 1;
+        }
+
+        await _context.SaveChangesAsync();
+
+        // Broadcast order update via SignalR
+        await _hubContext.Clients.All.SendAsync("OrderUpdated", sessionId);
+
+        return Ok(new { success = true, sessionId = session.Id, items = session.BillItems });
+    }
+
+}
+
+public class JoinTableRequest
+{
+    public string UserName { get; set; } = string.Empty;
 }
 
 public class OccupyTableRequest
 {
     public string ParticipantName { get; set; } = string.Empty;
+}
+
+public class SubmitOrdersRequest
+{
+    public List<SubmitOrderItem> Items { get; set; } = new();
+}
+
+public class SubmitOrderItem
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+    public int Quantity { get; set; } = 1;
 }
