@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Grid, Settings, QrCode } from 'lucide-react';
+import { LayoutDashboard, Grid, Settings, QrCode, BarChart2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 
@@ -43,7 +43,19 @@ const DashboardLayout = () => {
             }
           >
             <Grid size={20} />
-            <span className="font-medium">{t('Tables')}</span>
+            <span className="font-medium">Masalar</span>
+          </NavLink>
+          
+          <NavLink
+            to="/analytics"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                isActive ? 'bg-primary text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              }`
+            }
+          >
+            <BarChart2 size={20} />
+            <span className="font-medium">Analiz</span>
           </NavLink>
           
           <NavLink
@@ -55,7 +67,7 @@ const DashboardLayout = () => {
             }
           >
             <Settings size={20} />
-            <span className="font-medium">{t('Settings')}</span>
+            <span className="font-medium">Ayarlar</span>
           </NavLink>
         </nav>
       </aside>

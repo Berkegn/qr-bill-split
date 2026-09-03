@@ -1,4 +1,4 @@
-const BASE_URL = 'http://192.168.111.2:5079/api';
+const BASE_URL = 'http://localhost:5079/api';
 
 export const apiAgent = {
   get: async <T>(url: string): Promise<T> => {

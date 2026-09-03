@@ -169,11 +169,15 @@ function MainApp() {
   />;
 }
 
+import { CartProvider } from './src/contexts/CartContext';
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <MainApp />
+        <CartProvider>
+          <MainApp />
+        </CartProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

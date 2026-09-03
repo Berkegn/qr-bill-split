@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { TableSession, PayPartialRequest, SplitRemainingRequest, RouletteRequest, ApiResponse } from '../types';
 
-const BASE_URL = 'http://192.168.111.2:5079/api';
+const BASE_URL = 'http://localhost:5079/api';
 
 /**
  * ApiService encapsulates all HTTP requests to the backend, ensuring strictly typed data models and centralized error handling.

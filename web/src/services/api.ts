@@ -68,4 +68,45 @@ export const deleteProduct = async (id: string) => {
   return response.data;
 };
 
+export const uploadParseMenu = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post('/menu/upload-parse', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+// --- Employees API ---
+
+export const getEmployees = async () => {
+  const response = await api.get('/employees');
+  return response.data;
+};
+
+export const createEmployee = async (data: { fullName: string; roleId: number; email: string; phone: string }) => {
+  const response = await api.post('/employees', data);
+  return response.data;
+};
+
+export const deleteEmployee = async (id: string) => {
+  const response = await api.delete(`/employees/${id}`);
+  return response.data;
+};
+
+export const upsertShift = async (
+  employeeId: string,
+  data: { dayIndex: number; startTime: string; endTime: string }
+) => {
+  const response = await api.post(`/employees/${employeeId}/shifts`, data);
+  return response.data;
+};
+
+// --- Analytics API ---
+
+export const getAnalyticsSummary = async (days: number = 30) => {
+  const response = await api.get(`/analytics/daily-summary?days=${days}`);
+  return response.data;
+};
+
 export default api;

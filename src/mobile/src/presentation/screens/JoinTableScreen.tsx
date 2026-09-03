@@ -31,6 +31,17 @@ export default function JoinTableScreen({ tableId, onJoinSuccess }: Props) {
     }
   };
 
+  // Parse table number from GUID (e.g. "a0000000-0000-0000-0000-000000000005" → "5")
+  // or from slug format (e.g. "table-5" → "5")
+  const tableNumber = (() => {
+    const slugMatch = tableId.match(/(\d+)$/);
+    const n = slugMatch ? parseInt(slugMatch[1], 10) : null;
+    return n && n > 0 ? String(n) : null;
+  })();
+  const welcomeTitle = tableNumber
+    ? `Masa ${tableNumber}'e Hoş Geldiniz 👋`
+    : 'Hoş Geldiniz 👋';
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
@@ -38,15 +49,15 @@ export default function JoinTableScreen({ tableId, onJoinSuccess }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome to {tableId.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
-          <Text style={styles.subtitle}>Please enter your name to join the table session and view the menu.</Text>
+          <Text style={styles.title}>{welcomeTitle}</Text>
+          <Text style={styles.subtitle}>Menüyü görüntülemek ve oturuma katılmak için adınızı girin.</Text>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Enter your name"
+              placeholder="Adınızı girin"
               placeholderTextColor="#8E8E93"
               value={userName}
               onChangeText={setUserName}
@@ -63,7 +74,7 @@ export default function JoinTableScreen({ tableId, onJoinSuccess }: Props) {
             {isLoading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>Join Table</Text>
+              <Text style={styles.buttonText}>Masaya Katıl</Text>
             )}
           </TouchableOpacity>
         </View>

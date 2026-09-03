@@ -21,6 +21,9 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Receipt> Receipts { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<Product> Products { get; set; }
+    public DbSet<ProductOption> ProductOptions { get; set; }
+    public DbSet<Employee> Employees { get; set; }
+    public DbSet<Shift> Shifts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +49,27 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasOne(r => r.Table)
             .WithMany()
             .HasForeignKey(r => r.TableId)
-            .OnDelete(DeleteBehavior.SetNull); // Or NoAction depending on logic, let's keep it NoAction or default
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // ProductOption: store Choices as JSON
+        modelBuilder.Entity<ProductOption>()
+            .HasOne(po => po.Product)
+            .WithMany(p => p.Options)
+            .HasForeignKey(po => po.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductOption>()
+            .Property(po => po.Choices)
+            .HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>()
+            );
+
+        // Employee → Shifts
+        modelBuilder.Entity<Shift>()
+            .HasOne(s => s.Employee)
+            .WithMany(e => e.Shifts)
+            .HasForeignKey(s => s.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -3,6 +3,7 @@ import DashboardLayout from './components/DashboardLayout';
 import Tables from './pages/Tables';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import Analytics from './pages/Analytics';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="tables" element={<Tables />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

@@ -9,8 +9,9 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SocketService from '../services/SocketService';
 import OfflineQueueService from '../services/OfflineQueueService';
+import { useCart } from '../contexts/CartContext';
 
-const BASE_URL = 'http://192.168.111.2:5079/api';
+const BASE_URL = 'http://localhost:5079/api';
 
 type BillItemType = {
   uniqueId: string;
@@ -38,10 +39,10 @@ type SplitMode = 'equal' | 'itemized';
 
 export default function BillSplitScreen({ tableId, userId, currencySymbol, onBack, onMenu, onCheckoutSuccess, navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { cartItems, clearCart, totalPrice: cartTotal } = useCart();
   const [splitMode, setSplitMode] = useState<SplitMode>('itemized');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [items, setItems] = useState<BillItemType[]>([]);
-  const [isLoadingItems, setIsLoadingItems] = useState(true);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [personCount, setPersonCount] = useState<number>(1);
   // Menu State
@@ -50,49 +51,16 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
   const [menuProducts, setMenuProducts] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchTableData = async () => {
-      try {
-        setIsLoadingItems(true);
-        // Using tableId or a fallback GUID if undefined to prevent errors during testing
-        const currentTableId = tableId || '00000000-0000-0000-0000-000000000000';
-        const response = await axios.get(`${BASE_URL}/tables/${currentTableId}`);
-        
-        if (response.data && response.data.billItems) {
-          const fetchedItems = response.data.billItems;
-          const unrolled = fetchedItems.flatMap((item: any) => 
-            Array.from({ length: item.quantity || 1 }).map((_, idx) => ({
-              id: item.id,
-              name: item.name,
-              price: item.price,
-              qty: 1,
-              uniqueId: `${item.id}-${idx}`,
-              lockedByUserId: item.lockedByUserId,
-              lockedUntil: item.lockedUntil
-            }))
-          );
-          setItems(unrolled);
-        } else {
-          setItems([]);
-        }
-      } catch (error: any) {
-        console.error("Failed to fetch table data", error.message || error);
-        setItems([]);
-      } finally {
-        setIsLoadingItems(false);
-      }
-    };
-    
     const fetchMenu = async () => {
       try {
         const res = await axios.get(`${BASE_URL}/products`);
         setMenuProducts(res.data);
       } catch (e) {
-        console.warn("Failed to fetch menu products", e);
+        console.warn('Failed to fetch menu products', e);
       }
     };
 
     if (tableId) {
-      fetchTableData();
       fetchMenu();
       
       SocketService.connect().then(async () => {
@@ -107,16 +75,7 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
         }
       });
       
-      SocketService.on('OrderUpdated', fetchTableData);
-      SocketService.on('ItemLocked', fetchTableData);
-      SocketService.on('ItemUnlocked', fetchTableData);
     }
-
-    return () => {
-      SocketService.off('OrderUpdated');
-      SocketService.off('ItemLocked');
-      SocketService.off('ItemUnlocked');
-    };
   }, [tableId]);
   
   const [rouletteModalVisible, setRouletteModalVisible] = useState(false);
@@ -127,14 +86,11 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
   const [rouletteLoser, setRouletteLoser] = useState<{name: string, itemName: string, amount: number} | null>(null);
   
   let totalToPay = 0;
-  
   if (splitMode === 'equal') {
-    const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
-    totalToPay = totalAmount / personCount;
+    totalToPay = cartTotal / personCount;
   } else {
-    totalToPay = items
-      .filter((item) => selectedItemIds.includes(item.uniqueId))
-      .reduce((sum, item) => sum + item.price, 0);
+    // For itemized mode, show total of all cart items (user selects which to pay via menu)
+    totalToPay = cartTotal;
   }
 
   const toggleItemSelection = (uniqueId: string, item?: BillItemType) => {
@@ -180,15 +136,14 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
     
     setIsCheckingOut(true);
     try {
-      const selectedItems = items.filter(i => splitMode === 'equal' || selectedItemIds.includes(i.uniqueId));
-      const orderItemsPayload = selectedItems.map(item => ({
-        productName: item.name,
+      const orderItemsPayload = cartItems.map(item => ({
+        productName: item.name + (item.selectedOptions.length > 0 ? ` (${item.selectedOptions.map(o => o.choice).join(', ')})` : ''),
         price: item.price,
-        quantity: 1
+        quantity: item.quantity
       }));
       
       const payload = {
-        tableId: tableId || '00000000-0000-0000-0000-000000000000',
+        tableId: tableId,
         totalAmount: totalToPay,
         paymentMethod: splitMode === 'equal' ? 'EQUAL_SPLIT' : 'ITEMIZED_SPLIT',
         isSplitPayment: true,
@@ -218,6 +173,7 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
         { 
           text: "Tamam", 
           onPress: () => {
+             clearCart();
              if (onCheckoutSuccess) {
                onCheckoutSuccess(mockReceipt);
              } else {
@@ -228,7 +184,7 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
       ]);
     } catch (error: any) {
       console.error("Checkout error", error);
-      Alert.alert("Network Error", error?.message || "Please try again later.");
+      Alert.alert("Bağlantı Hatası", error?.message || "Lütfen daha sonra tekrar deneyin.");
     } finally {
       setIsCheckingOut(false);
     }
@@ -247,8 +203,8 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
     const mockUsers = ["Ahmet", "Ayşe", "Can", "Berke", "Elif"];
     const interval = setInterval(() => {
       setRouletteCurrentName(mockUsers[Math.floor(Math.random() * mockUsers.length)]);
-      if (mode === 'target' && items.length > 0) {
-        setRouletteCurrentItem(items[Math.floor(Math.random() * items.length)].name);
+      if (mode === 'target' && cartItems.length > 0) {
+        setRouletteCurrentItem(cartItems[Math.floor(Math.random() * cartItems.length)].name);
       }
     }, 100);
 
@@ -256,10 +212,9 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
       clearInterval(interval);
       const loserName = mockUsers[Math.floor(Math.random() * mockUsers.length)];
       if (mode === 'boss') {
-        const total = items.reduce((s, i) => s + i.price, 0);
-        setRouletteLoser({ name: loserName, itemName: "Tüm Hesap", amount: total });
+        setRouletteLoser({ name: loserName, itemName: "Tüm Hesap", amount: cartTotal });
       } else {
-        const item = items.length > 0 ? items[Math.floor(Math.random() * items.length)] : { name: "Havayı", price: 0 };
+        const item = cartItems.length > 0 ? cartItems[Math.floor(Math.random() * cartItems.length)] : { name: "Havayı", price: 0 };
         setRouletteLoser({ name: loserName, itemName: item.name, amount: item.price });
       }
       setRouletteStep('result');
@@ -268,8 +223,13 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
 
   const handleCallWaiter = async () => {
     if (tableId) {
-      await SocketService.callWaiter(tableId);
-      Alert.alert('Garson Çağrıldı', 'Garsona bildirim gönderildi.');
+      try {
+        await axios.post(`${BASE_URL}/tables/${tableId}/call-waiter`);
+        Alert.alert('Garson Çağrıldı', 'Garsona bildirim gönderildi.');
+      } catch (e) {
+        console.warn('Failed to call waiter:', e);
+        Alert.alert('Hata', 'Garson çağırılamadı.');
+      }
     }
   };
 
@@ -277,26 +237,12 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
     if (!tableId || isOrdering) return;
     setIsOrdering(true);
     try {
-      // Optimistic update
-      setItems(prev => [...prev, {
-        uniqueId: Math.random().toString(36).substring(7),
-        id: Math.floor(Math.random() * 1000),
-        name: itemName,
-        price: price,
-        qty: 1
-      }]);
       setMenuModalVisible(false);
-      Alert.alert('Eklendi', `${itemName} masaya eklendi.`);
-
-      // Queue action for offline support / backend sync
+      Alert.alert('Eklendi', `${itemName} masaya eklendi. Menü ekranından sepete ekleyebilirsiniz.`);
       OfflineQueueService.enqueue({
         type: 'ADD_ITEM',
         endpoint: `${BASE_URL}/b2b/tables/${tableId}/items`,
-        payload: {
-          name: itemName,
-          price: price,
-          quantity: 1
-        }
+        payload: { name: itemName, price, quantity: 1 }
       });
     } catch (e) {
       console.warn('Failed to place order:', e);
@@ -369,19 +315,42 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.receiptCard}>
           <View style={styles.receiptHeader}>
-            <Text style={styles.receiptTitle}>Your Order</Text>
-            <Text style={styles.receiptTotal}>{currencySymbol}{items.reduce((s, i) => s + i.price, 0).toFixed(2)}</Text>
+            <Text style={styles.receiptTitle}>Siparişiniz</Text>
+            <Text style={styles.receiptTotal}>{currencySymbol}{cartTotal.toFixed(2)}</Text>
           </View>
-          {isLoadingItems ? (
-            <View style={{ padding: 40, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#0A84FF" />
+          {cartItems.length === 0 ? (
+            <View style={{ padding: 32, alignItems: 'center', gap: 8 }}>
+              <Ionicons name="cart-outline" size={40} color="#C7C7CC" />
+              <Text style={{ color: '#8E8E93', fontSize: 15 }}>Henüz ürün eklenmedi.</Text>
+              <Text style={{ color: '#C7C7CC', fontSize: 13, textAlign: 'center' }}>
+                Menüye giderek sipariş verebilirsiniz.
+              </Text>
             </View>
           ) : (
-            <FlatList 
-              data={items}
-              keyExtractor={i => i.uniqueId}
-              renderItem={renderItem}
+            <FlatList
+              data={cartItems}
+              keyExtractor={i => i.cartId}
               scrollEnabled={false}
+              renderItem={({ item }) => (
+                <View style={[styles.itemCard, styles.itemCardSelected]}>
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.qtyBadge, styles.qtyBadgeSelected]}>
+                      <Text style={[styles.qtyText, styles.qtyTextSelected]}>{item.quantity}</Text>
+                    </View>
+                    <View>
+                      <Text style={[styles.itemName, styles.itemNameSelected]}>{item.name}</Text>
+                      {item.selectedOptions.length > 0 && (
+                        <Text style={{ fontSize: 12, color: '#8E8E93', marginTop: 2 }}>
+                          {item.selectedOptions.map(o => o.choice).join(' · ')}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={[styles.itemPrice, styles.itemPriceSelected]}>
+                    {currencySymbol}{(item.price * item.quantity).toFixed(2)}
+                  </Text>
+                </View>
+              )}
             />
           )}
         </View>
@@ -431,11 +400,11 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
 
               <View style={styles.checkoutRow}>
                 <View>
-                  <Text style={styles.payLabel}>You're paying</Text>
+                  <Text style={styles.payLabel}>Ödeyeceğiniz</Text>
                   <Text style={styles.totalAmount}>{currencySymbol}{totalToPay.toFixed(2)}</Text>
                 </View>
                 <TouchableOpacity 
-                  style={[styles.checkoutBtn, (isCheckingOut || items.length === 0) && { opacity: 0.7 }]} 
+                  style={[styles.checkoutBtn, (isCheckingOut || cartItems.length === 0) && { opacity: 0.7 }]} 
                   onPress={handleCheckout}
                   disabled={totalToPay === 0 || isCheckingOut}
                 >
@@ -444,7 +413,7 @@ export default function BillSplitScreen({ tableId, userId, currencySymbol, onBac
                     style={styles.checkoutGradient}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   >
-                    {isCheckingOut ? <ActivityIndicator color="#FFF" /> : <Text style={styles.checkoutBtnText}>Pay Now</Text>}
+                    {isCheckingOut ? <ActivityIndicator color="#FFF" /> : <Text style={styles.checkoutBtnText}>Şimdi Öde</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

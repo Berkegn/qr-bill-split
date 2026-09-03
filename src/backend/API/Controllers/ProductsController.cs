@@ -23,7 +23,9 @@ public class ProductsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetProducts()
     {
-        var products = await _context.Products.ToListAsync();
+        var products = await _context.Products
+            .Include(p => p.Options)
+            .ToListAsync();
         return Ok(products);
     }
 
@@ -31,13 +33,10 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> AddProduct([FromBody] Product product)
     {
         if (product.Id == Guid.Empty)
-        {
             product.Id = Guid.NewGuid();
-        }
-        
+
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
-        
         return Ok(new { success = true, product });
     }
 
@@ -46,9 +45,7 @@ public class ProductsController : ControllerBase
     {
         var product = await _context.Products.FindAsync(id);
         if (product == null)
-        {
-            return NotFound(new { success = false, message = "Product not found" });
-        }
+            return NotFound(new { success = false, message = "Ürün bulunamadı." });
 
         product.Name = productUpdate.Name;
         product.Price = productUpdate.Price;
@@ -56,7 +53,6 @@ public class ProductsController : ControllerBase
         product.Description = productUpdate.Description;
 
         await _context.SaveChangesAsync();
-        
         return Ok(new { success = true, product });
     }
 
@@ -65,13 +61,38 @@ public class ProductsController : ControllerBase
     {
         var product = await _context.Products.FindAsync(id);
         if (product == null)
-        {
-            return NotFound(new { success = false, message = "Product not found" });
-        }
+            return NotFound(new { success = false, message = "Ürün bulunamadı." });
 
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
-        
+        return Ok(new { success = true });
+    }
+
+    // POST /api/products/{id}/options — add a modifier group
+    [HttpPost("{id}/options")]
+    public async Task<IActionResult> AddProductOption(Guid id, [FromBody] ProductOption option)
+    {
+        var product = await _context.Products.FindAsync(id);
+        if (product == null)
+            return NotFound(new { success = false, message = "Ürün bulunamadı." });
+
+        option.Id = Guid.NewGuid();
+        option.ProductId = id;
+        _context.ProductOptions.Add(option);
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true, option });
+    }
+
+    // DELETE /api/products/options/{optionId}
+    [HttpDelete("options/{optionId}")]
+    public async Task<IActionResult> DeleteProductOption(Guid optionId)
+    {
+        var option = await _context.ProductOptions.FindAsync(optionId);
+        if (option == null)
+            return NotFound(new { success = false, message = "Seçenek bulunamadı." });
+
+        _context.ProductOptions.Remove(option);
+        await _context.SaveChangesAsync();
         return Ok(new { success = true });
     }
 }

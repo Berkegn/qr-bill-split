@@ -130,6 +130,32 @@ public class TablesController : ControllerBase
         return Ok(new { success = true, orders = session.BillItems });
     }
 
+    [HttpPost("{tableId}/call-waiter")]
+    public async Task<IActionResult> CallWaiter(string tableId)
+    {
+        string tableNumber = "Unknown";
+        string resolvedTableId = tableId;
+
+        if (Guid.TryParse(tableId, out var tableGuid))
+        {
+            var table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.Id == tableGuid || t.SessionId == tableGuid);
+            if (table != null)
+            {
+                tableNumber = table.TableNumber;
+                resolvedTableId = table.Id.ToString();
+            }
+        }
+
+        await _hubContext.Clients.All.SendAsync("OnWaiterCalled", new 
+        { 
+            TableId = resolvedTableId,
+            TableNumber = tableNumber,
+            CalledAt = DateTime.UtcNow
+        });
+
+        return Ok(new { success = true, message = "Waiter called." });
+    }
+
     [HttpPost("{tableId}/join")]
     public async Task<IActionResult> JoinTable(string tableId, [FromBody] JoinTableRequest request)
     {

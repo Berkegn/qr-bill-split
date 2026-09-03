@@ -21,6 +21,7 @@ const Tables = () => {
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [waiterCallingTableIds, setWaiterCallingTableIds] = useState<Set<string>>(new Set());
   
   // Modals state
   const [selectedTableForQr, setSelectedTableForQr] = useState<RestaurantTable | null>(null);
@@ -91,6 +92,44 @@ const Tables = () => {
 
     connection.on('AdminTableUpdated', (_tableId: string) => {
       // Refetch all tables to stay in sync with lock/unlock changes
+      fetchTables();
+    });
+
+    connection.on('OnTableCleared', (data: { tableId: string; tableNumber: string }) => {
+      console.log('🟢 OnTableCleared received:', data);
+      setTables(prevTables => prevTables.map(t => {
+        if (t.id === data.tableId) {
+          return {
+            ...t,
+            isOccupied: false,
+            status: 0,
+            occupants: [],
+          };
+        }
+        return t;
+      }));
+    });
+
+    connection.on('OnWaiterCalled', (data: { tableId: string; tableNumber: string }) => {
+      console.log('🔔 OnWaiterCalled received:', data);
+      setWaiterCallingTableIds(prev => new Set(prev).add(data.tableId));
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => {
+        setWaiterCallingTableIds(prev => {
+          const next = new Set(prev);
+          next.delete(data.tableId);
+          return next;
+        });
+      }, 8000);
+    });
+
+    connection.on('OnMenuUpdated', (data: { addedCount: number; categories: string[] }) => {
+      console.log('📋 OnMenuUpdated received:', data);
+      // Show a brief browser notification-style alert
+      const msg = `Menü güncellendi: ${data.addedCount} yeni ürün eklendi (${data.categories?.join(', ')}).`;
+      // Use a non-blocking toast if available, else console log
+      console.info(msg);
+      // Optionally trigger a table re-fetch to stay in sync
       fetchTables();
     });
 
@@ -284,9 +323,31 @@ const Tables = () => {
               badgeText = t('Reserved');
             }
 
+            const isWaiterCalling = waiterCallingTableIds.has(table.id);
+
             return (
-            <div key={table.id} className={`rounded-2xl p-6 border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group/card ${cardBgClass}`}>
+            <div 
+              key={table.id} 
+              className={`rounded-2xl p-6 border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group/card ${cardBgClass} ${isWaiterCalling ? 'ring-4 ring-amber-400 ring-opacity-75' : ''}`}
+              style={isWaiterCalling ? { animation: 'waiterPulse 1s ease-in-out infinite' } : {}}
+              onClick={() => {
+                if (isWaiterCalling) {
+                  setWaiterCallingTableIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(table.id);
+                    return next;
+                  });
+                }
+              }}
+            >
               <div className="absolute top-0 right-0 w-16 h-16 bg-white/40 rounded-bl-full -z-0"></div>
+              
+              {/* Waiter Call Overlay */}
+              {isWaiterCalling && (
+                <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-amber-400 text-amber-900 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg" style={{ animation: 'bellShake 0.5s ease-in-out infinite' }}>
+                  <span>🔔</span> Garson Çağrıldı!
+                </div>
+              )}
               
               <div className="flex justify-between items-start mb-6 relative z-10">
                 <div 

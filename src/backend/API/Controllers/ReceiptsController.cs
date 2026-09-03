@@ -1,13 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using QrBillSplit.Backend.Infrastructure.Data;
 using QrBillSplit.Backend.Core.Models;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using QrBillSplit.Backend.Core.Interfaces;
 using QrBillSplit.Backend.Core.DTOs;
 using QrBillSplit.Backend.Core.Exceptions;
+using QrBillSplit.Backend.Services.Hubs;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 
 namespace QrBillSplit.Backend.API.Controllers;
@@ -18,11 +22,13 @@ public class ReceiptsController : ControllerBase
 {
     private readonly IAppDbContext _context;
     private readonly ILogger<ReceiptsController> _logger;
+    private readonly IHubContext<TableSessionHub> _hubContext;
 
-    public ReceiptsController(IAppDbContext context, ILogger<ReceiptsController> logger)
+    public ReceiptsController(IAppDbContext context, ILogger<ReceiptsController> logger, IHubContext<TableSessionHub> hubContext)
     {
         _context = context;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -87,6 +93,48 @@ public class ReceiptsController : ControllerBase
         try
         {
             await _context.SaveChangesAsync();
+
+            // After successful payment: close table session and reset table
+            if (parsedTableId != Guid.Empty)
+            {
+                var table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.Id == parsedTableId || t.SessionId == parsedTableId);
+                
+                if (table != null)
+                {
+                    // Close all active sessions for this table
+                    var sessionId = table.SessionId.ToString();
+                    var sessions = await _context.TableSessions
+                        .Where(s => s.Id == sessionId || s.TableId == table.Id)
+                        .Where(s => s.IsActive)
+                        .ToListAsync();
+
+                    foreach (var session in sessions)
+                    {
+                        session.IsActive = false;
+                    }
+
+                    // Reset table to Available
+                    table.Status = 0;
+                    table.IsOccupied = false;
+                    table.Occupants.Clear();
+                    table.SessionId = Guid.NewGuid(); // New session ID for next usage
+
+                    await _context.SaveChangesAsync();
+
+                    // Broadcast table cleared to web dashboard
+                    await _hubContext.Clients.All.SendAsync("OnTableCleared", new 
+                    { 
+                        TableId = table.Id.ToString(),
+                        TableNumber = table.TableNumber
+                    });
+
+                    // Also fire existing TableStatusUpdated for backward compat
+                    await _hubContext.Clients.All.SendAsync("TableStatusUpdated", table);
+
+                    _logger.LogInformation("Table {TableId} cleared after checkout.", table.Id);
+                }
+            }
+
             return Ok(new { success = true, receiptId = receipt.Id, message = "Checkout successful." });
         }
         catch (Exception ex)

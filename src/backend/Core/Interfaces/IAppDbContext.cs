@@ -17,6 +17,9 @@ public interface IAppDbContext
     DbSet<Receipt> Receipts { get; set; }
     DbSet<OrderItem> OrderItems { get; set; }
     DbSet<Product> Products { get; set; }
+    DbSet<ProductOption> ProductOptions { get; set; }
+    DbSet<Employee> Employees { get; set; }
+    DbSet<Shift> Shifts { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

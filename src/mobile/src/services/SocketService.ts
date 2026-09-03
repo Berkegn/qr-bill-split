@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 // For local testing on iOS simulator, localhost is fine. 
 // For Android emulator it would be 10.0.2.2.
-const HUB_URL = 'http://192.168.111.2:5079/tablehub';
+const HUB_URL = 'http://localhost:5079/tablehub';
 
 class SocketService {
   private connection: signalR.HubConnection | null = null;
