@@ -1,0 +1,19 @@
+# .NET build output
+bin/
+obj/
+.vs/
+*.user
+
+# Node / Expo / Vite
+node_modules/
+dist/
+.expo/
+
+# Local settings and secrets
+.env
+.env.*
+appsettings.Local.json
+
+# macOS / editors
+.DS_Store
+.idea/
